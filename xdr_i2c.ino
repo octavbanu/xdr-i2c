@@ -20,7 +20,7 @@
 #include "align.h"
 
 /* If you have an IR diode for auto power-up, change this to 1 */
-#define IR 0
+#define IR 1
 
 /* If you have a transistor for auto power-up, change this to 1 */
 #define POWER 0
@@ -47,11 +47,11 @@
 #define INIT 0
 
 /* Pinout */
-#define RDS_PIN      16
-#define RESET_PIN    15
+#define RDS_PIN      17
+#define RESET_PIN    14
 
-#define IR_PIN       14
-#define POWER_PIN    17
+#define IR_PIN       0
+#define POWER_PIN    16
 
 #define SDA_PIN      18
 #define SCL_PIN      19
