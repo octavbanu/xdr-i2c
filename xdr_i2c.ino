@@ -1,4 +1,4 @@
-/*
+/* 
  *  XDR-I2C 2017-07-15
  *  Copyright (C) 2012-2017  Konrad Kosmatka
  *
