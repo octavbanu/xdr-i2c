@@ -111,19 +111,19 @@ class SoftI2cMaster : public I2cMasterBase {
  *
  * Uses ATmega TWI hardware port
  */
-class TwiMaster : public I2cMasterBase {
- public:
-  explicit TwiMaster(bool enablePullup);
-  uint8_t read(uint8_t last);
-  bool restart(uint8_t addressRW);
-  bool start(uint8_t addressRW);
-  /** \return status from last TWI command - useful for library debug */
-  uint8_t status(void) {return status_;}
-  void stop(void);
-  bool write(uint8_t data);
- private:
-  TwiMaster() {}
-  uint8_t status_;
-  void execCmd(uint8_t cmdReg);
-};
+//class TwiMaster : public I2cMasterBase {
+// public:
+//  explicit TwiMaster(bool enablePullup);
+//  uint8_t read(uint8_t last);
+//  bool restart(uint8_t addressRW);
+//  bool start(uint8_t addressRW);
+//  /** \return status from last TWI command - useful for library debug */
+//  uint8_t status(void) {return status_;}
+//  void stop(void);
+//  bool write(uint8_t data);
+// private:
+//  TwiMaster() {}
+//  uint8_t status_;
+//  void execCmd(uint8_t cmdReg);
+//};
 #endif  // I2C_MASTER_H

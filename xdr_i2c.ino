@@ -53,7 +53,8 @@
 #define IR_PIN       14
 #define POWER_PIN    17
 
-#define I2C_PINS I2C_PINS_18_19
+#define SDA_PIN      18
+#define SCL_PIN      19
 
 // below currently not used
 #define ROT_CW_PIN   6
@@ -64,7 +65,7 @@
 #define ANT_D_PIN   11
 #define BUTTON_PIN  13
 
-TwiMaster i2c(false);
+SoftI2cMaster i2c(SDA_PIN, SCL_PIN);
 
 /* TEF6730 IF */
 uint8_t CONTROL = 0x00;
@@ -312,7 +313,7 @@ void loop()
 }
 
 inline void initialize_i2c() {
-    Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, 400000, I2C_OP_MODE_IMM);
+    
 }
 
 inline void handle_rds_interrupt()

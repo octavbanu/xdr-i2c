@@ -132,92 +132,92 @@ bool SoftI2cMaster::write(uint8_t data) {
   return rtn == 0;
 }
 //==============================================================================
-void TwiMaster::execCmd(uint8_t cmdReg) {
-  // send command
-  TWCR = cmdReg;
-  // wait for command to complete
-  while (!(TWCR & (1 << TWINT)));
-  // status bits.
-  status_ = TWSR & 0xF8;
-}
-//------------------------------------------------------------------------------
-/**
- * Initialize hardware TWI.
- *
- * \param[in] enablePullup Enable the AVR internal pull-ups. The internal
- *  pull-ups can, in some systems, eliminate the need for external pull-ups.
- */
-TwiMaster::TwiMaster(bool enablePullup) {
-  // no prescaler
-  TWSR = 0;
-  // set bit rate factor
-  TWBR = (F_CPU/F_TWI - 16)/2;
-  // enable pull-ups if requested
-  if (enablePullup) {
-    digitalWrite(TWI_SDA_PIN, HIGH);
-    digitalWrite(TWI_SCL_PIN, HIGH);
-  }
-}
-//------------------------------------------------------------------------------
-/** Read a byte and send Ack if more reads follow else Nak to terminate read.
- *
- * \param[in] last Set true to terminate the read else false.
- *
- * \return The byte read from the I2C bus.
- */
-uint8_t TwiMaster::read(uint8_t last) {
-  execCmd((1 << TWINT) | (1 << TWEN) | (last ? 0 : (1 << TWEA)));
-  return TWDR;
-}
-//------------------------------------------------------------------------------
-/** Issue a restart condition.
- *
- * \param[in] addressRW I2C address with read/write bit.
- *
- * \return The value true, 1, for success or false, 0, for failure.
- */
-bool TwiMaster::restart(uint8_t addressRW) {
-  return start(addressRW);
-}
-//------------------------------------------------------------------------------
-/** Issue a start condition.
- *
- * \param[in] addressRW I2C address with read/write bit.
- *
- * \return The value true for success or false for failure.
- */
-bool TwiMaster::start(uint8_t addressRW) {
-  // send START condition
-  execCmd((1<<TWINT) | (1<<TWSTA) | (1<<TWEN));
-  if (status() != TWSR_START && status() != TWSR_REP_START) return false;
-
-  // send device address and direction
-  TWDR = addressRW;
-  execCmd((1 << TWINT) | (1 << TWEN));
-  if (addressRW & I2C_READ) {
-    return status() == TWSR_MRX_ADR_ACK;
-  } else {
-    return status() == TWSR_MTX_ADR_ACK;
-  }
-}
-//------------------------------------------------------------------------------
-/** Issue a stop condition. */
-void TwiMaster::stop(void) {
-  TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWSTO);
-
-  // wait until stop condition is executed and bus released
-  while (TWCR & (1 << TWSTO));
-}
-//------------------------------------------------------------------------------
-/**
- * Write a byte.
- *
- * \param[in] data The byte to send.
- *
- * \return The value true, 1, if the slave returned an Ack or false for Nak.
- */
-bool TwiMaster::write(uint8_t data) {
-  TWDR = data;
-  execCmd((1 << TWINT) | (1 << TWEN));
-  return status() == TWSR_MTX_DATA_ACK;
-}
+//void TwiMaster::execCmd(uint8_t cmdReg) {
+//  // send command
+//  TWCR = cmdReg;
+//  // wait for command to complete
+//  while (!(TWCR & (1 << TWINT)));
+//  // status bits.
+//  status_ = TWSR & 0xF8;
+//}
+////------------------------------------------------------------------------------
+///**
+// * Initialize hardware TWI.
+// *
+// * \param[in] enablePullup Enable the AVR internal pull-ups. The internal
+// *  pull-ups can, in some systems, eliminate the need for external pull-ups.
+// */
+//TwiMaster::TwiMaster(bool enablePullup) {
+//  // no prescaler
+//  TWSR = 0;
+//  // set bit rate factor
+//  TWBR = (F_CPU/F_TWI - 16)/2;
+//  // enable pull-ups if requested
+//  if (enablePullup) {
+//    digitalWrite(TWI_SDA_PIN, HIGH);
+//    digitalWrite(TWI_SCL_PIN, HIGH);
+//  }
+//}
+////------------------------------------------------------------------------------
+///** Read a byte and send Ack if more reads follow else Nak to terminate read.
+// *
+// * \param[in] last Set true to terminate the read else false.
+// *
+// * \return The byte read from the I2C bus.
+// */
+//uint8_t TwiMaster::read(uint8_t last) {
+//  execCmd((1 << TWINT) | (1 << TWEN) | (last ? 0 : (1 << TWEA)));
+//  return TWDR;
+//}
+////------------------------------------------------------------------------------
+///** Issue a restart condition.
+// *
+// * \param[in] addressRW I2C address with read/write bit.
+// *
+// * \return The value true, 1, for success or false, 0, for failure.
+// */
+//bool TwiMaster::restart(uint8_t addressRW) {
+//  return start(addressRW);
+//}
+////------------------------------------------------------------------------------
+///** Issue a start condition.
+// *
+// * \param[in] addressRW I2C address with read/write bit.
+// *
+// * \return The value true for success or false for failure.
+// */
+//bool TwiMaster::start(uint8_t addressRW) {
+//  // send START condition
+//  execCmd((1<<TWINT) | (1<<TWSTA) | (1<<TWEN));
+//  if (status() != TWSR_START && status() != TWSR_REP_START) return false;
+//
+//  // send device address and direction
+//  TWDR = addressRW;
+//  execCmd((1 << TWINT) | (1 << TWEN));
+//  if (addressRW & I2C_READ) {
+//    return status() == TWSR_MRX_ADR_ACK;
+//  } else {
+//    return status() == TWSR_MTX_ADR_ACK;
+//  }
+//}
+////------------------------------------------------------------------------------
+///** Issue a stop condition. */
+//void TwiMaster::stop(void) {
+//  TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWSTO);
+//
+//  // wait until stop condition is executed and bus released
+//  while (TWCR & (1 << TWSTO));
+//}
+////------------------------------------------------------------------------------
+///**
+// * Write a byte.
+// *
+// * \param[in] data The byte to send.
+// *
+// * \return The value true, 1, if the slave returned an Ack or false for Nak.
+// */
+//bool TwiMaster::write(uint8_t data) {
+//  TWDR = data;
+//  execCmd((1 << TWINT) | (1 << TWEN));
+//  return status() == TWSR_MTX_DATA_ACK;
+//}

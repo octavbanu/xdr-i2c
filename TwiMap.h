@@ -24,37 +24,37 @@
 #ifndef TwiMap_h
 #define TwiMap_h
 
-#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__)
-// 168 and 328 Arduinos
-
-uint8_t const TWI_SDA_PIN = 18;
-uint8_t const TWI_SCL_PIN = 19;
-//------------------------------------------------------------------------------
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-// Mega 1280 and 2560
-
-uint8_t const TWI_SDA_PIN = 20;
-uint8_t const TWI_SCL_PIN = 21;
-//------------------------------------------------------------------------------
-#elif defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644__)
-// Sanguino
-
-uint8_t const TWI_SDA_PIN = 17;
-uint8_t const TWI_SCL_PIN = 18;
-//------------------------------------------------------------------------------
-#elif defined(__AVR_ATmega32U4__)
-// Teensy 2.0
-
-uint8_t const TWI_SDA_PIN = 6;
-uint8_t const TWI_SCL_PIN = 5;
-//------------------------------------------------------------------------------
-#elif defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)
-// Teensy++ 1.0 & 2.0
-
-uint8_t const TWI_SDA_PIN = 1;
-uint8_t const TWI_SCL_PIN = 0;
-//------------------------------------------------------------------------------
-#else  // AVR CPU
-#error unknown CPU
-#endif  // AVR CPU
+//#if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328P__)
+//// 168 and 328 Arduinos
+//
+//uint8_t const TWI_SDA_PIN = 18;
+//uint8_t const TWI_SCL_PIN = 19;
+////------------------------------------------------------------------------------
+//#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+//// Mega 1280 and 2560
+//
+//uint8_t const TWI_SDA_PIN = 20;
+//uint8_t const TWI_SCL_PIN = 21;
+////------------------------------------------------------------------------------
+//#elif defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644__)
+//// Sanguino
+//
+//uint8_t const TWI_SDA_PIN = 17;
+//uint8_t const TWI_SCL_PIN = 18;
+////------------------------------------------------------------------------------
+//#elif defined(__AVR_ATmega32U4__)
+//// Teensy 2.0
+//
+//uint8_t const TWI_SDA_PIN = 6;
+//uint8_t const TWI_SCL_PIN = 5;
+////------------------------------------------------------------------------------
+//#elif defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)
+//// Teensy++ 1.0 & 2.0
+//
+//uint8_t const TWI_SDA_PIN = 1;
+//uint8_t const TWI_SCL_PIN = 0;
+////------------------------------------------------------------------------------
+//#else  // AVR CPU
+//#error unknown CPU
+//#endif  // AVR CPU
 #endif  // TwiMap_h
