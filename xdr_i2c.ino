@@ -47,10 +47,15 @@
 #define INIT 0
 
 /* Pinout */
-#define RDS_PIN      2
-#define IR_PIN       3
-#define POWER_PIN    4
-#define RESET_PIN    5
+#define RDS_PIN      16
+#define RESET_PIN    15
+
+#define IR_PIN       14
+#define POWER_PIN    17
+
+#define I2C_PINS I2C_PINS_18_19
+
+// below currently not used
 #define ROT_CW_PIN   6
 #define ROT_CCW_PIN  7
 #define ANT_A_PIN    8
@@ -58,8 +63,6 @@
 #define ANT_C_PIN   10
 #define ANT_D_PIN   11
 #define BUTTON_PIN  13
-#define SDA_PIN     A4
-#define SCL_PIN     A5
 
 TwiMaster i2c(false);
 
@@ -147,8 +150,13 @@ int8_t rotator_req = -1;
 #define ADDR2(a) (((a) & 0xFF00) >> 8)
 #define ADDR3(a) ((a) & 0xFF)
 
+#define CPU_RESTART_ADDR (uint32_t *)0xE000ED0C
+#define CPU_RESTART_VAL 0x5FA0004
+#define CPU_RESTART (*CPU_RESTART_ADDR = CPU_RESTART_VAL);
+
 void setup();
 void loop();
+inline void initialize_i2c();
 inline void handle_rds_interrupt();
 inline void handle_rotator();
 inline void handle_signal_check();
@@ -193,9 +201,15 @@ void ir_carrier(uint16_t);
 
 void setup()
 {
+    pinMode(LED_BUILTIN,OUTPUT);    // LED
+    digitalWrite(LED_BUILTIN,HIGH);  // LED on
+    delay(5000);
+    digitalWrite(LED_BUILTIN,LOW);  // LED on
+  
     pinMode(RDS_PIN, INPUT);
-    pinMode(SDA_PIN, INPUT);
-    pinMode(SCL_PIN, INPUT);
+    pinMode(18, INPUT);
+    pinMode(19, INPUT);
+
 
     pinMode(POWER_PIN, OUTPUT);
     digitalWrite(POWER_PIN, LOW);
@@ -225,6 +239,7 @@ void setup()
     pinMode(BUTTON_PIN, INPUT);
     digitalWrite(BUTTON_PIN, HIGH);
 
+    digitalWrite(LED_BUILTIN,HIGH);  // LED on
     Serial.begin(SERIAL_PORT_SPEED);
     while(true)
     {
@@ -236,7 +251,7 @@ void setup()
                 break;
         }
     }
-
+    digitalWrite(LED_BUILTIN,LOW);  // LED on
 #if IR_POWER_RESET && (IR || POWER)
     /* Reset the tuner before trying to power it up
        It might be already running! */
@@ -257,10 +272,12 @@ void setup()
 #endif
 
     digitalWrite(POWER_PIN, HIGH);
-    pinMode(SDA_PIN, OUTPUT);
-    pinMode(SCL_PIN, OUTPUT);
-    digitalWrite(SDA_PIN, HIGH);
-    digitalWrite(SCL_PIN, HIGH);
+    pinMode(18, OUTPUT);
+    pinMode(19, OUTPUT);
+    digitalWrite(18, HIGH);
+    digitalWrite(19, HIGH);
+
+    initialize_i2c();
     delay(100);
 
 #if INIT
@@ -288,10 +305,14 @@ void setup()
 void loop()
 {
     handle_rds_interrupt();
-    handle_hw_button();
-    handle_rotator();
+    // handle_hw_button();
+    // handle_rotator();
     handle_signal_check();
     handle_serial_command();
+}
+
+inline void initialize_i2c() {
+    Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, 400000, I2C_OP_MODE_IMM);
 }
 
 inline void handle_rds_interrupt()
@@ -644,11 +665,11 @@ inline void handle_serial_command()
         break;
 
     case 'X':
-        TWCR = 0; /* release SDA and SCL lines used by hardware I2C */
+        /* TWCR = 0; /* release SDA and SCL lines used by hardware I2C */
         digitalWrite(POWER_PIN, LOW);
         Serial.print("X\n");
         delay(10);
-        asm("jmp 0");
+        CPU_RESTART
         break;
     }
 }
