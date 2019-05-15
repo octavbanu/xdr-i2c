@@ -1,6 +1,9 @@
 XDR-I2C Controller Software - version working on Teensy LC
+Uses hardware-based i2c library - i2c_t3, https://github.com/nox771/i2c_t3
 Modifications: Pawel Walczak
 
+
+________________________________________________________
 Original README:
 
 XDR-F1HD I2C Controller
