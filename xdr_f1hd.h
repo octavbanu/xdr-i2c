@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
-#define DSP_I2C                  0x38
-#define IF_I2C                   0xC4
+#define DSP_I2C                  0x38>>1
+#define IF_I2C                   0xC4>>1
 
 #define DSP_FALSE                0x000
 #define DSP_TRUE                 0x7FF
@@ -558,4 +558,3 @@ const uint8_t DSP_AM[] PROGMEM =
 //  5,0x03,0x10,0x11,0x07,0x21, // audio volume scaler
     0
 };
-

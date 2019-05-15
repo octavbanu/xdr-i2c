@@ -14,7 +14,7 @@
  */
 #include <Arduino.h>
 #include <avr/pgmspace.h>
-#include "I2cMaster.h"
+#include <i2c_t3.h>
 #include "xdr_f1hd.h"
 #include "filters.h"
 #include "align.h"
@@ -53,8 +53,7 @@
 #define IR_PIN       0
 #define POWER_PIN    16
 
-#define SDA_PIN      18
-#define SCL_PIN      19
+#define WIRE_PINS   I2C_PINS_18_19
 
 // below currently not used
 #define ROT_CW_PIN   6
@@ -64,8 +63,6 @@
 #define ANT_C_PIN   10
 #define ANT_D_PIN   11
 #define BUTTON_PIN  13
-
-SoftI2cMaster i2c(SDA_PIN, SCL_PIN);
 
 /* TEF6730 IF */
 uint8_t CONTROL = 0x00;
@@ -200,6 +197,8 @@ bool st_pilot_test(uint8_t);
 void ir_sendcode(uint32_t);
 void ir_carrier(uint16_t);
 
+inline void init_i2c();
+
 void setup()
 {
     pinMode(LED_BUILTIN,OUTPUT);    // LED
@@ -208,9 +207,6 @@ void setup()
     digitalWrite(LED_BUILTIN,LOW);  // LED on
   
     pinMode(RDS_PIN, INPUT);
-    pinMode(18, INPUT);
-    pinMode(19, INPUT);
-
 
     pinMode(POWER_PIN, OUTPUT);
     digitalWrite(POWER_PIN, LOW);
@@ -278,7 +274,7 @@ void setup()
     digitalWrite(18, HIGH);
     digitalWrite(19, HIGH);
 
-    initialize_i2c();
+    init_i2c();
     delay(100);
 
 #if INIT
@@ -312,8 +308,9 @@ void loop()
     handle_serial_command();
 }
 
-inline void initialize_i2c() {
-    
+inline void init_i2c() {
+    Wire.begin(I2C_MASTER, 0x00, WIRE_PINS, I2C_PULLUP_EXT, 400000);
+    Wire.setDefaultTimeout(200000); // 10ms
 }
 
 inline void handle_rds_interrupt()
@@ -666,7 +663,6 @@ inline void handle_serial_command()
         break;
 
     case 'X':
-        /* TWCR = 0; /* release SDA and SCL lines used by hardware I2C */
         digitalWrite(POWER_PIN, LOW);
         Serial.print("X\n");
         delay(10);
@@ -678,38 +674,38 @@ inline void handle_serial_command()
 uint16_t dsp_read_16(uint32_t addr)
 {
     uint16_t buffer;
-    i2c.start(DSP_I2C | I2C_WRITE);
-    i2c.write(ADDR1(addr));
-    i2c.write(ADDR2(addr));
-    i2c.write(ADDR3(addr));
-    i2c.restart(DSP_I2C | I2C_READ);
-    buffer = ((uint16_t)i2c.read(false) << 8);
-    buffer |= i2c.read(true);
-    i2c.stop();
+    Wire.beginTransmission(DSP_I2C);
+    Wire.write(ADDR1(addr));
+    Wire.write(ADDR2(addr));
+    Wire.write(ADDR3(addr));
+    Wire.endTransmission(I2C_NOSTOP);
+    Wire.requestFrom(DSP_I2C, 2, I2C_STOP);
+    buffer = ((uint16_t)Wire.readByte() << 8);
+    buffer |= Wire.readByte();
     return buffer;
 }
 
 void dsp_write_24(uint32_t addr, uint32_t data)
 {
-    i2c.start(DSP_I2C | I2C_WRITE);
-    i2c.write(ADDR1(addr));
-    i2c.write(ADDR2(addr));
-    i2c.write(ADDR3(addr));
-    i2c.write((uint8_t)(data >> 16));
-    i2c.write((uint8_t)(data >> 8));
-    i2c.write((uint8_t)data);
-    i2c.stop();
+    Wire.beginTransmission(DSP_I2C);
+    Wire.write(ADDR1(addr));
+    Wire.write(ADDR2(addr));
+    Wire.write(ADDR3(addr));
+    Wire.write((uint8_t)(data >> 16));
+    Wire.write((uint8_t)(data >> 8));
+    Wire.write((uint8_t)data);
+    Wire.endTransmission();
 }
 
 void dsp_write_16(uint32_t addr, uint16_t data)
 {
-    i2c.start(DSP_I2C | I2C_WRITE);
-    i2c.write(ADDR1(addr));
-    i2c.write(ADDR2(addr));
-    i2c.write(ADDR3(addr));
-    i2c.write((uint8_t)(data >> 8));
-    i2c.write((uint8_t)data);
-    i2c.stop();
+    Wire.beginTransmission(DSP_I2C);
+    Wire.write(ADDR1(addr));
+    Wire.write(ADDR2(addr));
+    Wire.write(ADDR3(addr));
+    Wire.write((uint8_t)(data >> 8));
+    Wire.write((uint8_t)data);
+    Wire.endTransmission();
 }
 
 void dsp_write_data(const uint8_t* data)
@@ -718,10 +714,10 @@ void dsp_write_data(const uint8_t* data)
     uint8_t len = pgm_read_byte_near(data), pos;
     while(len)
     {
-        i2c.start(DSP_I2C | I2C_WRITE);
+        Wire.beginTransmission(DSP_I2C);
         for(pos=0; pos<len; pos++)
-            i2c.write(pgm_read_byte_near(data+i+pos));
-        i2c.stop();
+            Wire.write(pgm_read_byte_near(data+i+pos));
+        Wire.endTransmission();
         i += pos;
         len = pgm_read_byte_near(data+(i++));
     }
@@ -733,14 +729,14 @@ void dsp_write_coeff(uint8_t bank, uint8_t filter)
     uint16_t address = 0x0C00 + 32 * bank;
     while(i<64)
     {
-        i2c.start(DSP_I2C | I2C_WRITE);
-        i2c.write(0x01);
-        i2c.write(address >> 8);
-        i2c.write(address & 0xFF);
-        i2c.write(pgm_read_byte_near(filters[filter]+(i++)));
-        i2c.write(pgm_read_byte_near(filters[filter]+(i++)));
-        i2c.write(0x00);
-        i2c.stop();
+        Wire.beginTransmission(DSP_I2C);
+        Wire.write(0x01);
+        Wire.write(address >> 8);
+        Wire.write(address & 0xFF);
+        Wire.write(pgm_read_byte_near(filters[filter]+(i++)));
+        Wire.write(pgm_read_byte_near(filters[filter]+(i++)));
+        Wire.write(0x00);
+        Wire.endTransmission();
         address++;
     }
 }
@@ -786,39 +782,39 @@ bool dsp_set_filter(int8_t f)
 
 void dsp_set_deemphasis(uint8_t d)
 {
-    i2c.start(DSP_I2C | I2C_WRITE);
-    i2c.write(ADDR1(DSP_DEEMPHASIS));
-    i2c.write(ADDR2(DSP_DEEMPHASIS));
-    i2c.write(ADDR3(DSP_DEEMPHASIS));
+    Wire.beginTransmission(DSP_I2C);
+    Wire.write(ADDR1(DSP_DEEMPHASIS));
+    Wire.write(ADDR2(DSP_DEEMPHASIS));
+    Wire.write(ADDR3(DSP_DEEMPHASIS));
     switch(d)
     {
     default:
     case 0: /* 50us */
-        i2c.write(0x02);
-        i2c.write(0xC0);
-        i2c.write(0x04);
-        i2c.write(0xE4);
-        i2c.write(0x00);
-        i2c.write(0x85);
+        Wire.write(0x02);
+        Wire.write(0xC0);
+        Wire.write(0x04);
+        Wire.write(0xE4);
+        Wire.write(0x00);
+        Wire.write(0x85);
         break;
     case 1: /* 75us */
-        i2c.write(0x01);
-        i2c.write(0xF6);
-        i2c.write(0x05);
-        i2c.write(0xC3);
-        i2c.write(0x00);
-        i2c.write(0x85);
+        Wire.write(0x01);
+        Wire.write(0xF6);
+        Wire.write(0x05);
+        Wire.write(0xC3);
+        Wire.write(0x00);
+        Wire.write(0x85);
         break;
     case 2: /* off */
-        i2c.write(0x07);
-        i2c.write(0xFF);
-        i2c.write(0x00);
-        i2c.write(0x00);
-        i2c.write(0x00);
-        i2c.write(0x00);
+        Wire.write(0x07);
+        Wire.write(0xFF);
+        Wire.write(0x00);
+        Wire.write(0x00);
+        Wire.write(0x00);
+        Wire.write(0x00);
         break;
     }
-    i2c.stop();
+    Wire.endTransmission();
 }
 
 void dsp_read_rds()
@@ -927,29 +923,29 @@ void dsp_read_rds()
 float dsp_read_signal(uint8_t type)
 {
     float buffer;
-    i2c.start(DSP_I2C | I2C_WRITE);
+    Wire.beginTransmission(DSP_I2C);
     if(mode == MODE_FM && type == LEVEL_FAST)
     {
-        i2c.write(ADDR1(DSP_FM_LEVEL_FAST));
-        i2c.write(ADDR2(DSP_FM_LEVEL_FAST));
-        i2c.write(ADDR3(DSP_FM_LEVEL_FAST));
+        Wire.write(ADDR1(DSP_FM_LEVEL_FAST));
+        Wire.write(ADDR2(DSP_FM_LEVEL_FAST));
+        Wire.write(ADDR3(DSP_FM_LEVEL_FAST));
     }
     else if(mode == MODE_FM)
     {
-        i2c.write(ADDR1(DSP_FM_LEVEL));
-        i2c.write(ADDR2(DSP_FM_LEVEL));
-        i2c.write(ADDR3(DSP_FM_LEVEL));
+        Wire.write(ADDR1(DSP_FM_LEVEL));
+        Wire.write(ADDR2(DSP_FM_LEVEL));
+        Wire.write(ADDR3(DSP_FM_LEVEL));
     }
     else
     {
-        i2c.write(ADDR1(DSP_AM_LEVEL));
-        i2c.write(ADDR2(DSP_AM_LEVEL));
-        i2c.write(ADDR3(DSP_AM_LEVEL));
+        Wire.write(ADDR1(DSP_AM_LEVEL));
+        Wire.write(ADDR2(DSP_AM_LEVEL));
+        Wire.write(ADDR3(DSP_AM_LEVEL));
     }
-    i2c.restart(DSP_I2C | I2C_READ);
-    buffer = i2c.read(false);
-    buffer += (uint16_t)((i2c.read(false) << 8) | i2c.read(true)) / 65536.0;
-    i2c.stop();
+    Wire.endTransmission(I2C_NOSTOP); // restart
+    Wire.requestFrom(DSP_I2C, 3, I2C_STOP);
+    buffer = Wire.readByte();
+    buffer += (uint16_t)((Wire.readByte() << 8) | Wire.readByte()) / 65536.0;
 
     if(mode == MODE_FM)
         return (buffer * 0.797 + 3.5);
@@ -975,15 +971,16 @@ int8_t dsp_read_multipath(uint8_t level)
     multipath_min = 7723 * (uint32_t)level + 450000;
     multipath_max = multipath_min + 3187670; /* 38% of FS */
 
-    i2c.start(DSP_I2C | I2C_WRITE);
-    i2c.write(ADDR1(DSP_FM_MULTIPATH));
-    i2c.write(ADDR2(DSP_FM_MULTIPATH));
-    i2c.write(ADDR3(DSP_FM_MULTIPATH));
-    i2c.restart(DSP_I2C | I2C_READ);
-    output = (uint32_t)i2c.read(false) << 16;
-    output |= (uint16_t)i2c.read(true) << 8;
-    output |= i2c.read(true);
-    i2c.stop();
+    Wire.beginTransmission(DSP_I2C);
+    Wire.write(ADDR1(DSP_FM_MULTIPATH));
+    Wire.write(ADDR2(DSP_FM_MULTIPATH));
+    Wire.write(ADDR3(DSP_FM_MULTIPATH));
+    Wire.endTransmission(I2C_NOSTOP);
+    Wire.requestFrom(DSP_I2C, 3, I2C_STOP);
+    output = (uint32_t)Wire.readByte() << 16;
+    output |= (uint16_t)Wire.readByte() << 8;
+    output |= Wire.readByte();
+    
     output = constrain(output, multipath_min, multipath_max);
     output = map(output, multipath_min, multipath_max, 0, 100);
     return output;
@@ -992,22 +989,22 @@ int8_t dsp_read_multipath(uint8_t level)
 int8_t dsp_read_usn()
 {
     static int32_t last_value = -1;
-    uint32_t usn_min, usn_max, output, tmp;
+    uint32_t usn_min, usn_max, output;
     if(mode != MODE_FM || current_filter != -1)
     {
         last_value = -1;
         return -1;
     }
 
-    i2c.start(DSP_I2C | I2C_WRITE);
-    i2c.write(ADDR1(DSP_ULTRASONIC_NOISE));
-    i2c.write(ADDR2(DSP_ULTRASONIC_NOISE));
-    i2c.write(ADDR3(DSP_ULTRASONIC_NOISE));
-    i2c.restart(DSP_I2C | I2C_READ);
-    output = (uint32_t)i2c.read(false) << 16;
-    output |= (uint16_t)i2c.read(true) << 8;
-    output |= i2c.read(true);
-    i2c.stop();
+    Wire.beginTransmission(DSP_I2C);
+    Wire.write(ADDR1(DSP_ULTRASONIC_NOISE));
+    Wire.write(ADDR2(DSP_ULTRASONIC_NOISE));
+    Wire.write(ADDR3(DSP_ULTRASONIC_NOISE));
+    Wire.endTransmission(I2C_NOSTOP);
+    Wire.requestFrom(DSP_I2C, 3, I2C_STOP);
+    output = (uint32_t)Wire.readByte() << 16;
+    output |= (uint16_t)Wire.readByte() << 8;
+    output |= Wire.readByte();
 
     if(last_value != -1)
     {
@@ -1025,19 +1022,20 @@ int8_t dsp_read_usn()
 
 void tune(uint8_t reset_flags)
 {
-    i2c.start(DSP_I2C | I2C_WRITE);
-    i2c.write(0x00);
-    i2c.write(0xFF);
-    i2c.write(0xFF);
-    i2c.restart(IF_I2C | I2C_WRITE);
-    i2c.write(0x80);
-    i2c.write(CONTROL);
-    i2c.write(PLL>>8);
-    i2c.write(PLL&0xFF);
-    i2c.write(DAA);
-    i2c.write(AGC);
-    i2c.write(BAND);
-    i2c.stop();
+    Wire.beginTransmission(DSP_I2C);
+    Wire.write(0x00);
+    Wire.write(0xFF);
+    Wire.write(0xFF);
+    Wire.endTransmission(I2C_NOSTOP);
+    Wire.beginTransmission(IF_I2C);
+    Wire.write(0x80);
+    Wire.write(CONTROL);
+    Wire.write(PLL>>8);
+    Wire.write(PLL&0xFF);
+    Wire.write(DAA);
+    Wire.write(AGC);
+    Wire.write(BAND);
+    Wire.endTransmission();
     delay(4);
 
     if(!scan_flag)
