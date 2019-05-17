@@ -19,6 +19,18 @@
 #include "filters.h"
 #include "align.h"
 
+#ifdef KINETISK	// Teensy 3.x (not LC)
+#define XDR_USB_AUDIO 1	// for use later in the code
+#include "uda1380.h"
+#include <Audio.h>
+
+AudioInputI2S            i2s1;
+AudioOutputUSB           usb1;
+AudioConnection          patchCord1(i2s1, 0, usb1, 0);
+AudioConnection          patchCord3(i2s1, 1, usb1, 1);
+#endif
+
+
 /* If you have an IR diode for auto power-up, change this to 1 */
 #define IR 1
 
@@ -47,22 +59,22 @@
 #define INIT 0
 
 /* Pinout */
-#define RDS_PIN      17
-#define RESET_PIN    14
+#define RDS_PIN      15
+#define RESET_PIN    5
 
 #define IR_PIN       0
-#define POWER_PIN    16
+#define POWER_PIN    14
 
 #define WIRE_PINS   I2C_PINS_18_19
 
 // below currently not used
-#define ROT_CW_PIN   6
+/*#define ROT_CW_PIN   6
 #define ROT_CCW_PIN  7
 #define ANT_A_PIN    8
 #define ANT_B_PIN    9
 #define ANT_C_PIN   10
 #define ANT_D_PIN   11
-#define BUTTON_PIN  13
+#define BUTTON_PIN  13*/
 
 /* TEF6730 IF */
 uint8_t CONTROL = 0x00;
@@ -106,8 +118,8 @@ uint8_t scan_filter = 0;
 int8_t scan_antenna = -1;
 
 /* Antenna switch */
-const uint8_t ANT[] = {ANT_A_PIN, ANT_B_PIN, ANT_C_PIN, ANT_D_PIN};
-const uint8_t ANT_n = sizeof(ANT)/sizeof(uint8_t);
+/*const uint8_t ANT[] = {ANT_A_PIN, ANT_B_PIN, ANT_C_PIN, ANT_D_PIN};
+const uint8_t ANT_n = sizeof(ANT)/sizeof(uint8_t);*/
 uint8_t current_ant = 0;
 
 /* Other */
@@ -201,11 +213,6 @@ inline void init_i2c();
 
 void setup()
 {
-    pinMode(LED_BUILTIN,OUTPUT);    // LED
-    digitalWrite(LED_BUILTIN,HIGH);  // LED on
-    delay(5000);
-    digitalWrite(LED_BUILTIN,LOW);  // LED on
-  
     pinMode(RDS_PIN, INPUT);
 
     pinMode(POWER_PIN, OUTPUT);
@@ -219,12 +226,12 @@ void setup()
     digitalWrite(IR_PIN, LOW);
 #endif
 
-    pinMode(ROT_CW_PIN, OUTPUT);
+    /*pinMode(ROT_CW_PIN, OUTPUT);
     digitalWrite(ROT_CW_PIN, LOW);
     pinMode(ROT_CCW_PIN, OUTPUT);
-    digitalWrite(ROT_CCW_PIN, LOW);
+    digitalWrite(ROT_CCW_PIN, LOW);*/
 
-    pinMode(ANT_A_PIN, OUTPUT);
+    /*pinMode(ANT_A_PIN, OUTPUT);
     digitalWrite(ANT_A_PIN, LOW);
     pinMode(ANT_B_PIN, OUTPUT);
     digitalWrite(ANT_B_PIN, LOW);
@@ -234,10 +241,18 @@ void setup()
     digitalWrite(ANT_D_PIN, LOW);
     digitalWrite(ANT[current_ant], HIGH);
     pinMode(BUTTON_PIN, INPUT);
-    digitalWrite(BUTTON_PIN, HIGH);
+    digitalWrite(BUTTON_PIN, HIGH);*/
 
-    digitalWrite(LED_BUILTIN,HIGH);  // LED on
     Serial.begin(SERIAL_PORT_SPEED);
+    
+    #ifdef XDR_USB_AUDIO
+    if (uda1380_init()) {
+      Serial.println("UDA OK!");
+      AudioMemory(20);
+    } else {
+      Serial.println("UDA failed :(");
+    }
+    #endif
     while(true)
     {
         if(Serial.available() &&
@@ -248,7 +263,6 @@ void setup()
                 break;
         }
     }
-    digitalWrite(LED_BUILTIN,LOW);  // LED on
 #if IR_POWER_RESET && (IR || POWER)
     /* Reset the tuner before trying to power it up
        It might be already running! */
@@ -299,6 +313,8 @@ void setup()
     Serial.print("\nOK\n");
 }
 
+elapsedMillis fps;
+
 void loop()
 {
     handle_rds_interrupt();
@@ -323,81 +339,81 @@ inline void handle_rds_interrupt()
 
 inline void handle_hw_button()
 {
-    static uint8_t last_state = HIGH;
-    static uint8_t state = HIGH;
-    static uint32_t timer = 0;
-    uint8_t current = digitalRead(BUTTON_PIN);
-
-    if(current != last_state)
-        timer = millis();
-
-    if((millis() - timer) > BUTTON_DEBOUNCE &&
-       state != current)
-    {
-        state = current;
-        if(state == LOW)
-            Serial.print("!\n");
-    }
-    last_state = current;
+//    static uint8_t last_state = HIGH;
+//    static uint8_t state = HIGH;
+//    static uint32_t timer = 0;
+//    uint8_t current = digitalRead(BUTTON_PIN);
+//
+//    if(current != last_state)
+//        timer = millis();
+//
+//    if((millis() - timer) > BUTTON_DEBOUNCE &&
+//       state != current)
+//    {
+//        state = current;
+//        if(state == LOW)
+//            Serial.print("!\n");
+//    }
+//    last_state = current;
 }
 
 inline void handle_rotator()
 {
-    static int8_t state = ROTATION_OFF;
-    static int8_t last_state = ROTATION_OFF;
-    static int8_t queued = -1;
-    static uint32_t timer;
-
-    /* Request rotator stop automatically after a specified time */
-    if(state && (millis()-timer) >= ROTATOR_TIMEOUT*1000UL)
-        rotator_req = 0;
-
-    /* Nothing to do? */
-    if(rotator_req == -1)
-        return;
-
-    /* Stop the rotator */
-    if(state != ROTATION_OFF)
-    {
-        digitalWrite(ROT_CW_PIN, LOW);
-        digitalWrite(ROT_CCW_PIN, LOW);
-        timer = millis();
-        last_state = state;
-        state = ROTATION_OFF;
-    }
-
-    /* Only stop? */
-    if(rotator_req == ROTATION_OFF)
-        goto rotator_new_state;
-
-    /* Wait before changing a rotation direction */
-    if(((last_state == ROTATION_CW && rotator_req == ROTATION_CCW) ||
-        (last_state == ROTATION_CCW && rotator_req == ROTATION_CW)) &&
-       (millis()-timer) < ROTATOR_DELAY)
-    {
-        if(queued != rotator_req)
-        {
-            Serial.print("C-");
-            Serial.print(rotator_req, DEC);
-            Serial.print('\n');
-            queued = rotator_req;
-        }
-        return; 
-    }
-    
-    if(rotator_req == ROTATION_CW)
-        digitalWrite(ROT_CW_PIN, HIGH);
-    else
-        digitalWrite(ROT_CCW_PIN, HIGH);
-    timer = millis();
-
-rotator_new_state:
-    Serial.print('C');
-    Serial.print(rotator_req, DEC);
-    Serial.print('\n');
-    state = rotator_req;
-    rotator_req = -1;
-    queued = -1;
+//    static int8_t state = ROTATION_OFF;
+//    static int8_t last_state = ROTATION_OFF;
+//    static int8_t queued = -1;
+//    static uint32_t timer;
+//
+//    /* Request rotator stop automatically after a specified time */
+//    if(state && (millis()-timer) >= ROTATOR_TIMEOUT*1000UL)
+//        rotator_req = 0;
+//
+//    /* Nothing to do? */
+//    if(rotator_req == -1)
+//        return;
+//
+//    /* Stop the rotator */
+//    if(state != ROTATION_OFF)
+//    {
+//        digitalWrite(ROT_CW_PIN, LOW);
+//        digitalWrite(ROT_CCW_PIN, LOW);
+//        timer = millis();
+//        last_state = state;
+//        state = ROTATION_OFF;
+//    }
+//
+//    /* Only stop? */
+//    if(rotator_req == ROTATION_OFF)
+//        goto rotator_new_state;
+//
+//    /* Wait before changing a rotation direction */
+//    if(((last_state == ROTATION_CW && rotator_req == ROTATION_CCW) ||
+//        (last_state == ROTATION_CCW && rotator_req == ROTATION_CW)) &&
+//       (millis()-timer) < ROTATOR_DELAY)
+//    {
+//        if(queued != rotator_req)
+//        {
+//            Serial.print("C-");
+//            Serial.print(rotator_req, DEC);
+//            Serial.print('\n');
+//            queued = rotator_req;
+//        }
+//        return; 
+//    }
+//    
+//    if(rotator_req == ROTATION_CW)
+//        digitalWrite(ROT_CW_PIN, HIGH);
+//    else
+//        digitalWrite(ROT_CCW_PIN, HIGH);
+//    timer = millis();
+//
+//rotator_new_state:
+//    Serial.print('C');
+//    Serial.print(rotator_req, DEC);
+//    Serial.print('\n');
+//    state = rotator_req;
+//    rotator_req = -1;
+//    queued = -1;
 }
 
 inline void handle_signal_check()
@@ -1240,18 +1256,18 @@ void set_agc(uint8_t n)
 
 void set_antenna(uint8_t n)
 {
-    if(n < ANT_n)
-    {
-        digitalWrite(ANT[current_ant], LOW);
-        digitalWrite(ANT[n], HIGH);
-        current_ant = n;
-        signal_reset();
-        Serial.print('Z');
-        Serial.print(n, DEC);
-        Serial.print('\n');
-        delay(ANTENNA_SWITCH_DELAY);
-        rds_sync_reset();
-    }
+//    if(n < ANT_n)
+//    {
+//        digitalWrite(ANT[current_ant], LOW);
+//        digitalWrite(ANT[n], HIGH);
+//        current_ant = n;
+//        signal_reset();
+//        Serial.print('Z');
+//        Serial.print(n, DEC);
+//        Serial.print('\n');
+//        delay(ANTENNA_SWITCH_DELAY);
+//        rds_sync_reset();
+//    }
 }
 
 void serial_hex(uint8_t val)

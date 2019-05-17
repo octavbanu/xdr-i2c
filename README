@@ -1,4 +1,4 @@
-XDR-I2C Controller Software - version working on Teensy LC
+XDR-I2C Controller Software - version for Teensy boards (tested on LC and 3.2, latter also with XDR analog out -> UDA1380 -> USB)
 Uses hardware-based i2c library - i2c_t3, https://github.com/nox771/i2c_t3
 Modifications: Pawel Walczak
 
